@@ -1,3 +1,14 @@
+"""
+COMP3710 - Pattern Recognition - dataset.py
+
+Author: Nicholas Ardika
+Student ID: 48030102
+
+This file loads and processes the BioLaySumm 2025 dataset. The file provides
+implementations for tokenisation, dynamic batch padding and PyTorch DataLoaders 
+for training, validation and testing.
+"""
+
 import torch
 from datasets import load_dataset
 from transformers import AutoTokenizer, DataCollatorForSeq2Seq
@@ -20,26 +31,41 @@ class BioLaySummData():
         self.collator = None
 
     def load_data(self):
+        """Downloads the dataset from Hugging Face"""
         self.data = load_dataset(self.dataPath)
 
     def load_tokeniser(self, tokeniserName="google/flan-t5-base"):
+        """Initialises the tokeniser for the specified model"""
         self.tokeniser = AutoTokenizer.from_pretrained(tokeniserName)
 
     def load_collator(self):
+        """Initialises the collator used for data batch processing
+        
+        Input and label sequences are dynamically padded to the max length in 
+        each batch. Label padding is converted to -100 to ensure padded tokens
+        don't affect the loss.
+        """
         self.collator = DataCollatorForSeq2Seq(tokenizer=self.tokeniser, padding=True, label_pad_token_id=-100)
 
-    def setup_default(self):
-        self.load_tokeniser()
-        self.load_collator()
-        self.load_data()
-
     def get_collator(self):
+        """Returns the initialised collator"""    
         return self.collator
 
+    def setup_default(self):
+        """Initialises the default tokeniser, collator and dataset for general use"""
+        self.load_tokeniser()
+        self.load_collator()
+        self.load_data()   
+
     def apply_prefix(self, data):
+        """Adds the summarisation instruction to the start of each radiology report"""
         return [self.prefix + report for report in data["radiology_report"]]
 
     def tokenise_data(self, data):
+        """Tokenises the radiology reports and corresponding layman summaries
+        
+        Input and label token sequences are truncated to the specified max length
+        """
         inputs = self.apply_prefix(data)
         inputs = self.tokeniser(inputs, truncation=True, max_length=self.maxInputTokens)
 
@@ -49,6 +75,10 @@ class BioLaySummData():
         return inputs
 
     def process_split(self, split, batchSize):
+        """Gathers, tokenises and returns the specified dataset split
+        
+        The argument 'split' should be 'train', 'validation' or 'test
+        """
         data = self.data.get(split)
 
         data = data.map(self.tokenise_data, batched=True, batch_size=batchSize, remove_columns=data.column_names)
@@ -56,7 +86,13 @@ class BioLaySummData():
         return data
 
     def get_dataloader(self, split, batchSize):
-        data = self.process_split(split, batchSize)
+        """Creates a PyTorch dataloader for the specified dataset split
+
+        The argument 'split' should be 'train', 'validation' or 'test'. 
+        Data within the train split is shuffled, whereas validation and test
+        splits remain unshuffled
+        """
+        data = self.process_split(split, 512)
 
         return DataLoader(data, batch_size=batchSize, shuffle=(split=="train"), collate_fn=self.collator) 
 
@@ -64,7 +100,7 @@ if __name__ == "__main__":
     dataSet = BioLaySummData()
     dataSet.setup_default()
 
-    trainData = dataSet.get_dataloader("train", 512)
-    valData = dataSet.get_dataloader("validation", 512)
-    testData = dataSet.get_dataloader("test", 512)
+    trainData = dataSet.get_dataloader("train", 16)
+    valData = dataSet.get_dataloader("validation", 16)
+    testData = dataSet.get_dataloader("test", 16)
 
