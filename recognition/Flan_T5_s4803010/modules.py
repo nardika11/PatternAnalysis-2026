@@ -28,7 +28,20 @@ class FLANT5(nn.Module):
 
     def apply_lora(self):
         loraConfig = LoraConfig(r=16, lora_alpha=32, lora_dropout=0.05, 
-                                target_modules=["q", "v"], 
+                                target_modules="all-linear", 
                                 bias="none", task_type="SEQ_2_SEQ_LM")
 
         self.model = get_peft_model(self.model, loraConfig)
+
+    def display_parameter_counts(self):
+        total = sum(param.numel() for param in self.model.parameters())
+        trainable = sum(param.numel() for param in self.model.parameters() if param.requires_grad)
+
+        print(f"Total parameters: {total} ~ Trainable parameters: {trainable}")
+
+if __name__ == "__main__":
+    model = FLANT5(useLora=True)
+    model.display_parameter_counts()
+
+    model = FLANT5()
+    model.display_parameter_counts()
