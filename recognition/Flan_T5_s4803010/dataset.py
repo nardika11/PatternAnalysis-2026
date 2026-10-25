@@ -9,7 +9,6 @@ implementations for tokenisation, dynamic batch padding and PyTorch DataLoaders
 for training, validation and testing.
 """
 
-import torch
 from datasets import load_dataset
 from transformers import AutoTokenizer, DataCollatorForSeq2Seq
 from torch.utils.data import DataLoader
@@ -20,7 +19,7 @@ class BioLaySummData():
         self.dataPath = "BioLaySumm/BioLaySumm2025-LaymanRRG-opensource-track"
         self.data = None
 
-        # The maximumm length of each sequences tokenisation representation before truncation is performed
+        # The maximum length of each sequences tokenisation representation before truncation is performed
         self.maxInputTokens = 512
         self.maxLabelTokens = 512
 
@@ -45,11 +44,10 @@ class BioLaySummData():
         each batch. Label padding is converted to -100 to ensure padded tokens
         don't affect the loss.
         """
+        if self.tokeniser is None:
+            raise RuntimeError("Tokeniser not initialised. Run load_tokeniser() first.")
+        
         self.collator = DataCollatorForSeq2Seq(tokenizer=self.tokeniser, padding=True, label_pad_token_id=-100)
-
-    def get_collator(self):
-        """Returns the initialised collator"""    
-        return self.collator
 
     def setup_default(self):
         """Initialises the default tokeniser, collator and dataset for general use"""
@@ -66,6 +64,9 @@ class BioLaySummData():
         
         Input and label token sequences are truncated to the specified max length
         """
+        if self.tokeniser is None:
+            raise RuntimeError("Tokeniser not initialised. Run load_tokeniser() first.")
+        
         inputs = self.apply_prefix(data)
         inputs = self.tokeniser(inputs, truncation=True, max_length=self.maxInputTokens)
 
@@ -77,8 +78,14 @@ class BioLaySummData():
     def process_split(self, split, batchSize):
         """Gathers, tokenises and returns the specified dataset split
         
-        The argument 'split' should be 'train', 'validation' or 'test
+        The argument 'split' should be 'train', 'validation' or 'test'
         """
+        if self.data is None:
+            raise RuntimeError("Data not initialised. Run load_data() first.")
+        
+        if split not in self.data:
+            raise ValueError(f"Invalid dataset split: {split}")
+        
         data = self.data.get(split)
 
         data = data.map(self.tokenise_data, batched=True, batch_size=batchSize, remove_columns=data.column_names)
@@ -92,6 +99,12 @@ class BioLaySummData():
         Data within the train split is shuffled, whereas validation and test
         splits remain unshuffled
         """
+        if self.data is None or self.tokeniser is None or self.collator is None:
+            raise RuntimeError("Dataset not initialised. Run setup_default() first.")
+
+        if split not in self.data:
+            raise ValueError(f"Invalid dataset split: {split}")
+        
         data = self.process_split(split, 512)
 
         return DataLoader(data, batch_size=batchSize, shuffle=(split=="train"), collate_fn=self.collator) 
