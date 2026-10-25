@@ -4,13 +4,16 @@ from transformers import AutoTokenizer, DataCollatorForSeq2Seq
 from torch.utils.data import DataLoader
 
 class BioLaySummData():
+    """Data class used to perform loading and preprocessing of the BioLaySumm dataset from Hugging Face"""
     def __init__(self):
         self.dataPath = "BioLaySumm/BioLaySumm2025-LaymanRRG-opensource-track"
         self.data = None
 
+        # The maximumm length of each sequences tokenisation representation before truncation is performed
         self.maxInputTokens = 512
         self.maxLabelTokens = 512
 
+        # LLM instruction that are added to the input texts
         self.prefix = "Summarise the medical report into lay language for a general audience: "
 
         self.tokeniser = None
@@ -52,13 +55,16 @@ class BioLaySummData():
 
         return data
 
+    def get_dataloader(self, split, batchSize):
+        data = self.process_split(split, batchSize)
+
+        return DataLoader(data, batch_size=batchSize, shuffle=(split=="train"), collate_fn=self.collator) 
+
 if __name__ == "__main__":
     dataSet = BioLaySummData()
     dataSet.setup_default()
 
-    trainData = dataSet.process_split("train", 512)
-    valData = dataSet.process_split("validation", 512)
-    testData = dataSet.process_split("test", 512)
+    trainData = dataSet.get_dataloader("train", 512)
+    valData = dataSet.get_dataloader("validation", 512)
+    testData = dataSet.get_dataloader("test", 512)
 
-    trainLoader = DataLoader(trainData, batch_size=16, shuffle=True, collate_fn=dataSet.get_collator())
-    foo = next(iter(trainLoader))
