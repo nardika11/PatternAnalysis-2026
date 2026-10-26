@@ -6,17 +6,18 @@ Student ID: 48030102
 
 This file ... TODO
 """
-
+import os
 import torch
 import random
 import evaluate
+import pandas as pd
+import matplotlib.pyplot as plt
 from tqdm import tqdm
 from time import time
+from modules import FLANT5
+from dataset import BioLaySummData
 from torch.utils.data import DataLoader, Subset
 from transformers import get_linear_schedule_with_warmup
-from dataset import BioLaySummData
-from modules import FLANT5
-import matplotlib.pyplot as plt
 
 ROOT_PATH = "./recognition/Flan_T5_s4803010"
 
@@ -107,7 +108,7 @@ def train(model, trainLoader, valLoader, epochs, lr, patience):
             bestValLoss = valLoss
             epochsWithoutImproving = 0
 
-            trainingType = "LoRA" if model.useLora else "Full"
+            trainingType = "lora" if model.useLora else "full"
             bestModelPath = f"{ROOT_PATH}/models/FlanT5_{trainingType}_lr{lr}"
             model.model.save_pretrained(bestModelPath)
         else:
@@ -148,7 +149,8 @@ def evaluate_rouge(model, valLoader, tokeniser):
             startTime = time()
             batchOutput = model.generate(input_ids=batch["input_ids"], 
                                          attention_mask=batch["attention_mask"],
-                                         max_new_tokens=512)
+                                         max_new_tokens=512,
+                                         no_repeat_ngram_size=5)
             totalGenerationTime += time() - startTime
 
             specialTokens = set(tokeniser.all_special_ids)
@@ -195,7 +197,8 @@ def test(model, testLoader, tokeniser, prefix, seed=12, numCases=5):
 
             batchOutput = model.generate(input_ids=batch["input_ids"], 
                                          attention_mask=batch["attention_mask"],
-                                         max_new_tokens=512)
+                                         max_new_tokens=512,
+                                         no_repeat_ngram_size=5)
 
             originalReport = tokeniser.decode(batch["input_ids"][0], skip_special_tokens=True)
             originalReport = originalReport.removeprefix(prefix).strip()
@@ -205,7 +208,6 @@ def test(model, testLoader, tokeniser, prefix, seed=12, numCases=5):
             originalReports.append(originalReport)
             generatedSummaries.append(outputSummary)
 
-    print("Manual Test Evaluation!")
     for i in range(numCases):
         print(f"\nOriginal Report: {originalReports[i]}")
         print(f"Generated Summary: {generatedSummaries[i]}")
@@ -227,4 +229,84 @@ def plot_training_loss(trainLosses, valLosses, modelName):
     plt.legend()
     plt.tight_layout()
 
-    plt.savefig(f"{ROOT_PATH}/results/loss_plot_{modelName}")
+    plt.savefig(f"{ROOT_PATH}/results/loss_plot_{modelName}.png")
+    plt.close()
+
+def main_experiment():
+    print(f"{'-'*10} Beginning Experiments {'-'*10}")
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    torch.manual_seed(12)
+
+    os.makedirs(f"{ROOT_PATH}/results", exist_ok=True)
+    os.makedirs(f"{ROOT_PATH}/models", exist_ok=True)
+
+    print(f"\n{'-'*10} Loading Data {'-'*10}")
+    dataset = BioLaySummData()
+    dataset.setup_default()
+    tokeniser = dataset.tokeniser
+
+    trainLoader = dataset.get_dataloader("train", 16)
+    valLoader = dataset.get_dataloader("validation", 16)
+    testLoader = dataset.get_dataloader("test", 16)
+
+    learningRates = {"full": 1e-5, "lora": 1e-4}
+    results = {}
+    safetySamples = {}
+
+    for modelType in ["full", "lora"]:
+        print(f"\n{'-'*10} Training {modelType} Fine-Tuned Model {'-'*10}")
+
+        model = FLANT5(useLora=(modelType=="lora")).to(device)
+        lr = learningRates[modelType]
+
+        trainingResults = train(model, trainLoader, valLoader, epochs=10, lr=lr, patience=2)
+
+        bestEpoch = trainingResults["Val Losses"].index(min(trainingResults["Val Losses"]))
+
+        plot_training_loss(trainingResults["Train Losses"], 
+                           trainingResults["Val Losses"], 
+                           modelName=modelType)
+
+        results[modelType] = {"Best Epoch": bestEpoch + 1,
+                              "Best Train Loss": trainingResults["Train Losses"][bestEpoch],
+                              "Best Val Loss": trainingResults["Val Losses"][bestEpoch],
+                              "Training Time": trainingResults["Training Time"],
+                              "Peak VRAM (GB)": trainingResults["Max VRAM"] / (1024**3)}
+
+        save_data(results, safetySamples)
+
+        del model
+
+    for modelType in ["untuned", "full", "lora"]:
+        print(f"\n{'-'*10} Training {modelType} Model {'-'*10}")
+
+        model = FLANT5(useLora=(modelType=="lora")).to(device)
+
+        if modelType != "untuned":
+            lr = learningRates[modelType]
+            model.load_tuned_model(f"{ROOT_PATH}/models/FlanT5_{modelType}_lr{lr}")
+
+        rougeScores = evaluate_rouge(model, valLoader, tokeniser)
+        paramCounts = model.display_parameter_counts()
+        sampleGenerations = test(model, testLoader, tokeniser, dataset.prefix)
+
+        results.setdefault(modelType, {})
+        results[modelType].update(rougeScores)
+        results[modelType].update(paramCounts)
+
+        safetySamples[modelType] = sampleGenerations
+
+        save_data(results, safetySamples)
+
+        del model
+
+def save_data(results, safetySamples):
+    results = pd.DataFrame.from_dict(results, orient="index")
+    results.to_csv(f"{ROOT_PATH}/results/results.csv", index_label="Model")
+
+    safetySamples = pd.DataFrame.from_dict(safetySamples, orient="index")
+    safetySamples.to_csv(f"{ROOT_PATH}/results/safetySamples.csv", index_label="Model")
+
+
+if __name__ == "__main__":
+    main_experiment()
