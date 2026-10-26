@@ -24,7 +24,9 @@ class BioLaySummData():
         self.maxLabelTokens = 512
 
         # LLM instruction that are added to the input texts
-        self.prefix = "Summarise the medical report into lay language for a general audience: "
+        self.prefix = ("Summarise the medical report into lay language for a general "
+                       "audience, the summary should be simpler and easier to understand"
+                       "whilst still preserving all important clinical findings: ")
 
         self.tokeniser = None
         self.collator = None
