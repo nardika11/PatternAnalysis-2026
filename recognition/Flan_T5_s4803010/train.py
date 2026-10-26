@@ -7,9 +7,12 @@ Student ID: 48030102
 This file ... TODO
 """
 
-from tqdm import tqdm
 import torch
+import evaluate
+from tqdm import tqdm
 from transformers import get_linear_schedule_with_warmup
+from dataset import BioLaySummData
+from modules import FLANT5
 
 def train_single_epoch(model, trainLoader, optimiser, scheduler, scaler):
     model.train()
@@ -101,3 +104,35 @@ def train(model, trainLoader, valLoader, epochs, lr, patience):
             break
     
     return trainLosses, valLosses
+
+def evaluate_rouge(model, valLoader, tokeniser):
+    model.eval()
+    device = next(model.parameters()).device
+
+    
+    generatedSummaries = []
+    originalSummaries = []
+
+    with torch.no_grad():
+        for batch in tqdm(valLoader, desc="Evaluating rouge", unit="batch", ncols=100):
+            batch = {key: value.to(device) for key, value in batch.items()}
+
+            batchOutput = model.generate(input_ids=batch["input_ids"], 
+                                            attention_mask=batch["attention_mask"],
+                                            max_new_tokens=512)
+
+            outputSummaries = tokeniser.batch_decode(batchOutput, skip_special_tokens=True)
+
+            labels = batch["labels"].clone()
+            labels[labels == -100] = tokeniser.pad_token_id
+            labelSummaries = tokeniser.batch_decode(labels, skip_special_tokens=True)
+
+            generatedSummaries.extend(outputSummaries)
+            originalSummaries.extend(labelSummaries)
+
+    rouge = evaluate.load("rouge")
+    scores = rouge.compute(predictions=generatedSummaries, 
+                           references=originalSummaries, 
+                           use_stemmer=True)
+
+    return scores
