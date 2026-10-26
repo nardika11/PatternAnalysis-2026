@@ -8,8 +8,10 @@ This file ... TODO
 """
 
 import torch
+import random
 import evaluate
 from tqdm import tqdm
+from torch.utils.data import DataLoader, Subset
 from transformers import get_linear_schedule_with_warmup
 from dataset import BioLaySummData
 from modules import FLANT5
@@ -127,8 +129,8 @@ def evaluate_rouge(model, valLoader, tokeniser):
             batch = {key: value.to(device) for key, value in batch.items()}
 
             batchOutput = model.generate(input_ids=batch["input_ids"], 
-                                            attention_mask=batch["attention_mask"],
-                                            max_new_tokens=512)
+                                         attention_mask=batch["attention_mask"],
+                                         max_new_tokens=512)
 
             outputSummaries = tokeniser.batch_decode(batchOutput, skip_special_tokens=True)
 
@@ -145,3 +147,41 @@ def evaluate_rouge(model, valLoader, tokeniser):
                            use_stemmer=True)
 
     return scores
+
+def test(model, testLoader, tokeniser, seed=12, numCases=5):
+    model.eval()
+    device = next(model.parameters()).device
+
+    originalReports = []
+    generatedSummaries = []
+
+    rng = random.Random(seed)
+    indices = rng.sample(range(len(testLoader.dataset)), numCases)
+
+    testSubset = DataLoader(Subset(testLoader.dataset, indices), 
+                           batch_size=1, shuffle=False,
+                           collate_fn=testLoader.collate_fn)
+
+    with torch.no_grad():
+        for batch in testSubset:
+            batch = {key: value.to(device) for key, value in batch.items()}
+
+            batchOutput = model.generate(input_ids=batch["input_ids"], 
+                                         attention_mask=batch["attention_mask"],
+                                         max_new_tokens=512)
+
+            originalReport = tokeniser.decode(batch["input_ids"][0], skip_special_tokens=True)
+            originalReport = originalReport.removeprefix("Summarise the medical report into lay language for a general audience: ").strip()
+
+            outputSummary = tokeniser.decode(batchOutput[0], skip_special_tokens=True)
+
+            originalReports.append(originalReport)
+            generatedSummaries.append(outputSummary)
+
+    print("Manual Test Evaluation!")
+    for i in range(numCases):
+        print(f"\nOriginal Report: {originalReports[i]}")
+        print(f"Generated Summary: {generatedSummaries[i]}")
+
+    return {"Original Reports": originalReports, 
+            "Generated Summaries": generatedSummaries}
