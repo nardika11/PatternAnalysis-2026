@@ -7,7 +7,9 @@ Student ID: 48030102
 This file ... TODO
 """
 
+from tqdm import tqdm
 import torch
+from transformers import get_linear_schedule_with_warmup
 
 def train_single_epoch(model, trainLoader, optimiser, scheduler, scaler):
     model.train()
@@ -58,3 +60,44 @@ def validate(model, valLoader):
             totalLoss += loss.item()
 
     return totalLoss / len(valLoader)
+
+def train(model, trainLoader, valLoader, epochs, lr, patience):
+    device = next(model.parameters()).device
+
+    trainableParams = [param for param in model.parameters() if param.requires_grad]
+
+    optimiser = torch.optim.AdamW(trainableParams, lr=lr, weight_decay=0.01)
+    scheduler = get_linear_schedule_with_warmup(
+        optimizer=optimiser,
+        num_training_steps=len(trainLoader) * epochs,
+        num_warmup_steps=int(len(trainLoader) * epochs * 0.05)
+    )
+
+    scaler = torch.amp.GradScaler(device.type)
+
+    trainLosses, valLosses = [], []
+    bestValLoss = float("inf")
+    epochsWithoutImproving = 0
+
+    trainProgress = tqdm(range(epochs), desc="Training", unit="epoch", ncols=100)
+    for epoch in trainProgress:
+        trainLoss = train_single_epoch(model, trainLoader, optimiser, scheduler, scaler)
+        valLoss = validate(model, valLoader)
+
+        trainLosses.append(trainLoss)
+        valLosses.append(valLoss)
+
+        trainProgress.set_postfix({"Train Loss": f"{trainLoss:.4f}",
+                                   "Val Loss": f"{valLoss:.4f}"})
+
+        if valLoss < bestValLoss:
+            bestValLoss = valLoss
+            epochsWithoutImproving = 0
+        else:
+            epochsWithoutImproving += 1
+
+        if epochsWithoutImproving >= patience:
+            print(f"Early stopping at epoch {epoch+1}")
+            break
+    
+    return trainLosses, valLosses
