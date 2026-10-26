@@ -61,11 +61,13 @@ class FLANT5(nn.Module):
         self.model = get_peft_model(self.model, loraConfig)
 
     def display_parameter_counts(self):
-        """Display the total and trainable parameter counts of the model"""
+        """Display and return the total and trainable parameter counts of the model"""
         total = sum(param.numel() for param in self.model.parameters())
         trainable = sum(param.numel() for param in self.model.parameters() if param.requires_grad)
 
         print(f"Total parameters: {total} ~ Trainable parameters: {trainable}")
+
+        return {"Total Parameters": total, "Trainable Parameters": trainable}
 
     def load_tuned_model(self, path):
         """Loads the saved weights from after LoRA or full fine-tuning the model

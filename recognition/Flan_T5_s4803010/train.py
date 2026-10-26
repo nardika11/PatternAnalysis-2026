@@ -11,6 +11,7 @@ import torch
 import random
 import evaluate
 from tqdm import tqdm
+from time import time
 from torch.utils.data import DataLoader, Subset
 from transformers import get_linear_schedule_with_warmup
 from dataset import BioLaySummData
@@ -71,14 +72,14 @@ def validate(model, valLoader):
 def train(model, trainLoader, valLoader, epochs, lr, patience):
     device = next(model.parameters()).device
 
+    startTime = time()
     trainableParams = [param for param in model.parameters() if param.requires_grad]
 
     optimiser = torch.optim.AdamW(trainableParams, lr=lr, weight_decay=0.01)
     scheduler = get_linear_schedule_with_warmup(
         optimizer=optimiser,
         num_training_steps=len(trainLoader) * epochs,
-        num_warmup_steps=int(len(trainLoader) * epochs * 0.05)
-    )
+        num_warmup_steps=int(len(trainLoader) * epochs * 0.05))
 
     scaler = torch.amp.GradScaler(device.type)
 
@@ -86,6 +87,9 @@ def train(model, trainLoader, valLoader, epochs, lr, patience):
     bestValLoss = float("inf")
     epochsWithoutImproving = 0
     bestModelPath = None
+
+    if device.type == "cuda":
+        torch.cuda.reset_peak_memory_stats()
 
     trainProgress = tqdm(range(epochs), desc="Training", unit="epoch", ncols=100)
     for epoch in trainProgress:
@@ -112,10 +116,20 @@ def train(model, trainLoader, valLoader, epochs, lr, patience):
             print(f"Early stopping at epoch {epoch+1}")
             break
 
+    trainingTime = time() - startTime
+
+    if device.type == "cuda":
+        maxVram = torch.cuda.max_memory_allocated()
+    else:
+        maxVram = 0.0
+
     if bestModelPath is not None:
         model.load_tuned_model(bestModelPath)
     
-    return trainLosses, valLosses
+    return {"Train Losses": trainLosses,
+            "Val Losses": valLosses,
+            "Training Time": trainingTime,
+            "Max VRAM": maxVram}
 
 def evaluate_rouge(model, valLoader, tokeniser):
     model.eval()
@@ -123,14 +137,24 @@ def evaluate_rouge(model, valLoader, tokeniser):
 
     generatedSummaries = []
     originalSummaries = []
+    totalGenerationTime = 0.0
+    totalTokensGenerated = 0.0
 
     with torch.no_grad():
         for batch in tqdm(valLoader, desc="Evaluating rouge", unit="batch", ncols=100):
             batch = {key: value.to(device) for key, value in batch.items()}
 
+            startTime = time()
             batchOutput = model.generate(input_ids=batch["input_ids"], 
                                          attention_mask=batch["attention_mask"],
                                          max_new_tokens=512)
+            totalGenerationTime += time() - startTime
+
+            specialTokens = set(tokeniser.all_special_ids)
+
+            for seq in batchOutput:
+                totalTokensGenerated += sum([token.item() not in specialTokens
+                                             for token in seq])
 
             outputSummaries = tokeniser.batch_decode(batchOutput, skip_special_tokens=True)
 
@@ -146,7 +170,9 @@ def evaluate_rouge(model, valLoader, tokeniser):
                            references=originalSummaries, 
                            use_stemmer=True)
 
-    return scores
+    inferenceThroughput = totalTokensGenerated / totalGenerationTime if totalGenerationTime > 0 else 0.0
+
+    return {**scores, "Inference Throughput": inferenceThroughput}
 
 def test(model, testLoader, tokeniser, seed=12, numCases=5):
     model.eval()
