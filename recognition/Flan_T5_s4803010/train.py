@@ -16,6 +16,7 @@ from torch.utils.data import DataLoader, Subset
 from transformers import get_linear_schedule_with_warmup
 from dataset import BioLaySummData
 from modules import FLANT5
+import matplotlib.pyplot as plt
 
 ROOT_PATH = "./recognition/Flan_T5_s4803010"
 
@@ -174,7 +175,7 @@ def evaluate_rouge(model, valLoader, tokeniser):
 
     return {**scores, "Inference Throughput": inferenceThroughput}
 
-def test(model, testLoader, tokeniser, seed=12, numCases=5):
+def test(model, testLoader, tokeniser, prefix, seed=12, numCases=5):
     model.eval()
     device = next(model.parameters()).device
 
@@ -197,7 +198,7 @@ def test(model, testLoader, tokeniser, seed=12, numCases=5):
                                          max_new_tokens=512)
 
             originalReport = tokeniser.decode(batch["input_ids"][0], skip_special_tokens=True)
-            originalReport = originalReport.removeprefix("Summarise the medical report into lay language for a general audience: ").strip()
+            originalReport = originalReport.removeprefix(prefix).strip()
 
             outputSummary = tokeniser.decode(batchOutput[0], skip_special_tokens=True)
 
@@ -211,3 +212,19 @@ def test(model, testLoader, tokeniser, seed=12, numCases=5):
 
     return {"Original Reports": originalReports, 
             "Generated Summaries": generatedSummaries}
+
+def plot_training_loss(trainLosses, valLosses, modelName):
+    plt.figure(figsize=(8,6))
+
+    epochs = range(1, len(trainLosses)+1)
+
+    plt.plot(epochs, trainLosses, label="Training Loss")
+    plt.plot(epochs, valLosses, label="Validation Loss")
+
+    plt.xlabel("Epochs")
+    plt.ylabel("Loss")
+    plt.title(f"Training and Validation Loss for {modelName} Fine-Tuned Model")
+    plt.legend()
+    plt.tight_layout()
+
+    plt.savefig(f"{ROOT_PATH}/results/loss_plot_{modelName}")
