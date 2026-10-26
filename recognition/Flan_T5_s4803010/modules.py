@@ -27,6 +27,7 @@ class FLANT5(nn.Module):
 
         self.model = AutoModelForSeq2SeqLM.from_pretrained(modelName)
 
+        self.useLora = useLora
         if useLora:
             self.apply_lora()
 

@@ -14,6 +14,8 @@ from transformers import get_linear_schedule_with_warmup
 from dataset import BioLaySummData
 from modules import FLANT5
 
+ROOT_PATH = "./recognition/Flan_T5_s4803010"
+
 def train_single_epoch(model, trainLoader, optimiser, scheduler, scaler):
     model.train()
     device = next(model.parameters()).device
@@ -96,6 +98,9 @@ def train(model, trainLoader, valLoader, epochs, lr, patience):
         if valLoss < bestValLoss:
             bestValLoss = valLoss
             epochsWithoutImproving = 0
+
+            trainingType = "LoRA" if model.useLora else "Full"
+            model.model.save_pretrained(f"{ROOT_PATH}/models/FlanT5_{trainingType}_epochs{epoch}_lr{lr}")
         else:
             epochsWithoutImproving += 1
 
