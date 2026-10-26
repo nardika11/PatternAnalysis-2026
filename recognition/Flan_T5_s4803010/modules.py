@@ -67,6 +67,19 @@ class FLANT5(nn.Module):
 
         print(f"Total parameters: {total} ~ Trainable parameters: {trainable}")
 
+    def load_tuned_model(self, path):
+        """Loads the saved weights from after LoRA or full fine-tuning the model
+        
+        Reloads on the neccessary weights such that weights that weren't updated
+        during training aren't touched, in order to reduce computational resources
+        """
+        if self.useLora:
+            self.model.load_adapter(path, adapter_name="fine_tuned")
+            self.model.set_adapter("fine_tuned")
+        else:
+            device = next(self.model.parameters()).device
+            self.model = AutoModelForSeq2SeqLM.from_pretrained(path).to(device)
+
 if __name__ == "__main__":
     # Testing that the parameter counts are reasonably correct when using LoRA
     model = FLANT5(useLora=True)
