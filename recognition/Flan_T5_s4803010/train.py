@@ -83,6 +83,7 @@ def train(model, trainLoader, valLoader, epochs, lr, patience):
     trainLosses, valLosses = [], []
     bestValLoss = float("inf")
     epochsWithoutImproving = 0
+    bestModelPath = None
 
     trainProgress = tqdm(range(epochs), desc="Training", unit="epoch", ncols=100)
     for epoch in trainProgress:
@@ -100,13 +101,17 @@ def train(model, trainLoader, valLoader, epochs, lr, patience):
             epochsWithoutImproving = 0
 
             trainingType = "LoRA" if model.useLora else "Full"
-            model.model.save_pretrained(f"{ROOT_PATH}/models/FlanT5_{trainingType}_epochs{epoch}_lr{lr}")
+            bestModelPath = f"{ROOT_PATH}/models/FlanT5_{trainingType}_lr{lr}"
+            model.model.save_pretrained(bestModelPath)
         else:
             epochsWithoutImproving += 1
 
         if epochsWithoutImproving >= patience:
             print(f"Early stopping at epoch {epoch+1}")
             break
+
+    if bestModelPath is not None:
+        model.load_tuned_model(bestModelPath)
     
     return trainLosses, valLosses
 
@@ -114,7 +119,6 @@ def evaluate_rouge(model, valLoader, tokeniser):
     model.eval()
     device = next(model.parameters()).device
 
-    
     generatedSummaries = []
     originalSummaries = []
 
