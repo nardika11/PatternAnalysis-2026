@@ -32,7 +32,7 @@ def train_single_epoch(model, trainLoader, optimiser, scheduler, scaler):
         optimiser.zero_grad()
 
         # Utilises mixed precision
-        with torch.autocast(device_type=device.type, dtype=torch.float16):
+        with torch.autocast(device_type=device.type, dtype=torch.bfloat16):
             # Passes the input ids, attention masks and labels to FLAN-T5 for a forward pass
             output = model(**batch)
 
@@ -63,7 +63,7 @@ def validate(model, valLoader):
             batch = {key: value.to(device) for key, value in batch.items()}
 
             # Utilises mixed precision same as training
-            with torch.autocast(device_type=device.type, dtype=torch.float16):
+            with torch.autocast(device_type=device.type, dtype=torch.bfloat16):
                 output = model(**batch)
                 loss = output.loss
 
@@ -83,7 +83,7 @@ def train(model, trainLoader, valLoader, epochs, lr, patience):
         num_training_steps=len(trainLoader) * epochs,
         num_warmup_steps=int(len(trainLoader) * epochs * 0.05))
 
-    scaler = torch.amp.GradScaler(device.type)
+    scaler = torch.amp.GradScaler(device.type, enabled=False)
 
     trainLosses, valLosses = [], []
     bestValLoss = float("inf")
