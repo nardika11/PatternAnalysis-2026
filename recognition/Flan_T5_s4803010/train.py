@@ -26,7 +26,7 @@ def train_single_epoch(model, trainLoader, optimiser, scheduler, scaler):
     device = next(model.parameters()).device
 
     totalLoss = 0.0
-    for batch in trainLoader:
+    for batch in tqdm(trainLoader, desc="Batch Progress", unit="batches", ncols=100):
         batch = {key: value.to(device) for key, value in batch.items()}
 
         optimiser.zero_grad()
@@ -149,7 +149,7 @@ def evaluate_rouge(model, valLoader, tokeniser):
             startTime = time()
             batchOutput = model.generate(input_ids=batch["input_ids"], 
                                          attention_mask=batch["attention_mask"],
-                                         max_new_tokens=512,
+                                         max_new_tokens=256,
                                          no_repeat_ngram_size=5)
             totalGenerationTime += time() - startTime
 
@@ -197,7 +197,7 @@ def test(model, testLoader, tokeniser, prefix, seed=12, numCases=5):
 
             batchOutput = model.generate(input_ids=batch["input_ids"], 
                                          attention_mask=batch["attention_mask"],
-                                         max_new_tokens=512,
+                                         max_new_tokens=256,
                                          no_repeat_ngram_size=5)
 
             originalReport = tokeniser.decode(batch["input_ids"][0], skip_special_tokens=True)
@@ -208,8 +208,10 @@ def test(model, testLoader, tokeniser, prefix, seed=12, numCases=5):
             originalReports.append(originalReport)
             generatedSummaries.append(outputSummary)
 
+    print(f"{'-'*10} Beginning Safety Audit {'-'*10}")
     for i in range(numCases):
-        print(f"\nOriginal Report: {originalReports[i]}")
+        print(f"\nSample {i+1}")
+        print(f"Original Report: {originalReports[i]}")
         print(f"Generated Summary: {generatedSummaries[i]}")
 
     return {"Original Reports": originalReports, 
@@ -249,7 +251,7 @@ def main_experiment():
     valLoader = dataset.get_dataloader("validation", 16)
     testLoader = dataset.get_dataloader("test", 16)
 
-    learningRates = {"full": 1e-5, "lora": 1e-4}
+    learningRates = {"full": 5e-5, "lora": 1e-4}
     results = {}
     safetySamples = {}
 
@@ -259,7 +261,7 @@ def main_experiment():
         model = FLANT5(useLora=(modelType=="lora")).to(device)
         lr = learningRates[modelType]
 
-        trainingResults = train(model, trainLoader, valLoader, epochs=10, lr=lr, patience=2)
+        trainingResults = train(model, trainLoader, valLoader, epochs=4, lr=lr, patience=2)
 
         bestEpoch = trainingResults["Val Losses"].index(min(trainingResults["Val Losses"]))
 
@@ -278,7 +280,7 @@ def main_experiment():
         del model
 
     for modelType in ["untuned", "full", "lora"]:
-        print(f"\n{'-'*10} Training {modelType} Model {'-'*10}")
+        print(f"\n{'-'*10} Evaluating {modelType} Model {'-'*10}")
 
         model = FLANT5(useLora=(modelType=="lora")).to(device)
 

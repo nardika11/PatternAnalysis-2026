@@ -21,7 +21,7 @@ class BioLaySummData():
 
         # The maximum length of each sequences tokenisation representation before truncation is performed
         self.maxInputTokens = 512
-        self.maxLabelTokens = 512
+        self.maxLabelTokens = 256
 
         # LLM instruction that are added to the input texts
         self.prefix = ("Summarise the medical report into lay language for a general "
@@ -109,7 +109,8 @@ class BioLaySummData():
         
         data = self.process_split(split, 512)
 
-        return DataLoader(data, batch_size=batchSize, shuffle=(split=="train"), collate_fn=self.collator) 
+        return DataLoader(data, batch_size=batchSize, shuffle=(split=="train"), 
+                          collate_fn=self.collator, num_workers=4, pin_memory=True) 
 
 if __name__ == "__main__":
     dataSet = BioLaySummData()
