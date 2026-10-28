@@ -44,6 +44,34 @@ By training on just the smaller two matrices, LoRA significantly reduces the amo
 ### 6.3 Engineering Recommendations
 
 ## 7. Feasibility Review
+### 7.1 User Need, Scope and Acceptance Criteria
+Medical reports can be confusing for patients to understand which can cause anxiety. The purpose of this project is to assist with the translation of medical reports into layman language to increase readability for the general public who may not have medical knowledge. Within the project, experimentation will be conducted to investigate whether fine-tuning a model preserves more medical accuracy compared to a zero-shot baseline model. 
+
+Acceptance Criteria:
+- FLAN-T5 models are successfully trained using both LoRA and full fine-tuning 
+- Fine tuning improves Rouge evaluation metric compared to a zero-shot baseline
+- A manual evaluation is conducted on sample cases to identify errors such as hallucinations, missing information and layman readability
+- An evaluation on the trade-offs between Rouge metrics and clinical accuracy/readability has been conducted
+- Training is able to be completed using the rangpur A100 cluster in under 5 hours each, with training metrics such as runtime, peak VRAM and parameter counts being documented
+
+### 7.2 Model Choice and Course Concepts
+Google's FLAN-T5 encoder-decoder model will be the foundation of each model variation that is experimented on for the project, which is a hard difficulty. FLAN-T5 is an instruction based sequence to sequence model that has been trained for over 1000 NLP tasks which also includes summarisation. Additionally, the FLAN-T5 architecture is well suited for this projects task, since the encoder component allows the model to understand and create representations for the medical report, while the decoder component can then decode these representations in order to generate layman summaries of the original text. 
+
+The original FLAN-T5 will be used as a zero-shot untuned baseline model, to compare against the two fine-tuned variations. The second variation will use LoRA fine-tuning, which tunes a subset of the models parameters in order to reduce the computational resources required. The last variation uses full fine-tuning in order to tune all parameters based on the training set. Using the two versions of fine-tuning allows for the investigation between the required computational requirements and the summarisation quality. 
+
+### 7.3 Preliminary Feasibility Evidence
+The BioLaySumm dataset provided already has predefined train, validation and test splits with the following respective proportions 88%, 5.8% and 6.2%, so in order to prevent data leakage these splits will be preserved throughout the project. Each datapoint has four features, source, images_path, radiology_report and layman_report. For the project only the last two features are relevant and will be used, radiology_report as the input and layman_report as the target.
+
+The tokenised inputs and labels need to be truncated to a max token length in order to assist with limiting the computational resources (specifically GPU memory and processing time) needed to train and run the models. Initial experimentation has been completed which found that the 99th percentile for token size for the inputs size was 300.47 and 296 for the labels. It was also found that for the inputs the max token length was 1742 with a median of 47, and for the labels these respective values were 1176 and 41. This suggests that a max token length of 512 is suitable as it ensures that over 99% of the inputs and labels never get truncated whilst only truncating some rare cases over 512 tokens. This ensures loss of data is minimised while still getting the benefit of computational resource reduction. 
+
+Another key finding within the above experimentation is that the median token lengths were very low (47 and 41) compared to the truncation limit that was just formed. Because of this static padding to 512 creates a large amount of useless padding which increases computational costs. To solve this dynamic padding can be used which will only pad inputs/labels to the max token sequence length within the current batch. Since most sequences are roughly 50 tokens in length, most batches shouldn't use large amounts of useless padding.  
+
+### 7.4 Risks, Budget and Fallback
+Due to the large computational requirements (plus possible Rangpur wait times) to perform full fine tuning on the FLAN-T5 model, there is a risks that the full fine tuning isn't able to be completed in time. A possible fallback would be to use the FLAN-T5 small version rather than the base model, which only has 80 million parameters rather than 250 million. This should reduce the computational requirements needed to perform full fine tuning and could increase the feasibility to compute on my local machine rather than queuing for Rangpur. 
+
+Another risk is that the fine tuned model perform worse on the ROUGE evaluation metrics compared to the baseline model. This would make it hard to answer the project question of whether fine tuned models improve medical context summarisation or just plain english summarisation. 
+
+After the baseline model completion for the feasibility test, the next step is to implement the module and setup required for LoRA fine tuning. After this the full fine tuning will be trained and then all three versions will be evaluated against each other. 
 
 ## 8. AI Usage Disclosure
 
