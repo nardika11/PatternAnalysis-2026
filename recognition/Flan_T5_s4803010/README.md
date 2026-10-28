@@ -13,6 +13,10 @@ Google's FLAN-T5-base model is used as the foundational model of the project. It
 
 Although FLAN-T5 is well suited for general summarisation, it is not optimised specifically for clinical radiology reports, which is where fine-tuning comes in. Fine-tuning the model using the BioLaySumm dataset allows the model to better learn medical terminology in order to produce summaries that can be better understood by patients, whilst still preserving key clinical information.  
 
+![FLAN-T5 model Architecture](./reference_images/FlanT5.png)
+
+*Figure 1: FLAN-T5 model architecture*
+
 ### 2.2 Full Fine-Tuning
 Full fine-tuning involves updating all of the models parameters during training in order to get better performance specifically using the BioLaySumm training dataset. During the forward pass, the inputs are processed through the model, while backpropagation calculates the gradients in order to update entire model's weight matrix. However this approach can be more computationally expensive, requiring higher GPU memory usage in order to calculate/store gradients and update parameters.
 
@@ -20,6 +24,10 @@ Full fine-tuning involves updating all of the models parameters during training 
 Low-Rank Adaptation aims to make fine-tuning more efficient by reducing the number of parameters that are updated during training. This is done by freezing the original model's weight matrix and introduces two smaller matrices within selected layers. These matrices are updated during training and then are merged with the original weight matrix after training to produce the final model. Similarly to full fine-tuning, a forward pass is performed on the original weight matrix (plus the smaller matrices for LoRA), however backpropagration is only performed on the smaller matrices. 
 
 By training on just the smaller two matrices, LoRA significantly reduces the amount of trainable parameters, therefore reducing the computational requirements. However by limiting the parameter updated to a smaller subset, the model's ability to learn clinical summarisation may be limited compared to full fine-tuning.
+
+![Fine tuning diagram](./reference_images/Lora.png)
+
+*Figure 2: Comparison of full fine-tuning and LoRA*
 
 ## 3. Dataset and Preprocessing
 ### 3.1 BioLaySumm Dataset
