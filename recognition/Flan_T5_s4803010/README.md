@@ -22,9 +22,32 @@ Low-Rank Adaptation aims to make fine-tuning more efficient by reducing the numb
 By training on just the smaller two matrices, LoRA significantly reduces the amount of trainable parameters, therefore reducing the computational requirements. However by limiting the parameter updated to a smaller subset, the model's ability to learn clinical summarisation may be limited compared to full fine-tuning.
 
 ## 3. Dataset and Preprocessing
-### 3.1 BioLaySummm Dataset
+### 3.1 BioLaySumm Dataset
+The main dataset used within the project is the BioLaySumm 2025 Layman RRG dataset, which contains radiology reports along with corresponding summaries suited for a general audience. The reports are used as the model's inputs, and the summaries are used as the target outputs during the training process. An example report and summary can be seen below.
+
+**Report**: Cardiomegaly. Hiatal hernia. No areas of consolidation are observed. 
+
+**Summary**: The heart is enlarged, and there is a hernia at the diaphragm opening. No areas of lung consolidation are seen.
+
 ### 3.2 Data Preprocessing
+Before the data inputs are passed to the models, an instruction prompt is added to the beginning of each report. This provides the FLAN-T5 model with guidance to generate layman summaries whilst preserving key clinical details. The exact prompt used can be seen below.
+
+**Prompt**: Summarise the medical report into lay language for a general audience, the summary should be simpler and easier to understand whilst still preserving all important clinical findings: 
+
+After this, both the reports and the summaries are tokenised using the pretrained FLAN-T5-Base tokeniser. The input reports are truncated to a max token length of 512, while the summaries are truncated to 256 tokens. These lengths were chosen in order to limit the computational requirements and GPU memory usage. Through an analysis it was observed that these limits ensure that atleast 98% of the data is never truncated. However, truncation on the remaining longer data sequences introduces the risk of removing important clinical information before it is even passed to the models.
+
+It was observed that the median token length was roughly 41 tokens. Due to this dynamic padding was used in order to pad sequences to the max length within each batch rather than padding everything to the predefined max token length. This reduces excessive padding and therefore reduces the computational requirements. Additionally, the padding tokens for the summary sequences were masked to a value of -100, this ensured that they were ignored when calculating losses.
+
 ### 3.3 Data Splits
+The dataset contained predefined training, validation and testing sets. An initial check was conducted on a subset of the data in order to determine if any reports were duplicated across the splits. No duplicates were seen within this subset, although the entire dataset was not completely checked. Therefore, within the project the predefined splits were maintained in order to reduce the risk of data leakage. 
+
+| Dataset Split | Number of Samples | Purpose |
+| --- | --- | --- |
+| Training | 150,454 | Fine-tuning the models |
+| Validation | 10,000 | Observing validation losses, selecting checkpoints, and calculating overall ROUGE scores |
+| Test | 10,537 | Generating unseen examples for the clinical safety audit | 
+
+Note that both training and validation sets contained the radiology reports as well as the layman summaries. Whereas the test set did not contain the layman summaries for the corresponding reports. Because of this the models performance (using ROUGE) was evaluated on the validation set, while the test set was saved for the manual clinical safety audit.
 
 ## 4. Implementation and Training
 ### 4.1 File Structure
