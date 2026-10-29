@@ -309,6 +309,33 @@ def plot_training_loss(trainLosses, valLosses, modelName):
     plt.savefig(f"{ROOT_PATH}/results/loss_plot_{modelName}.png")
     plt.close()
 
+def plot_rouge_comparison():
+    """Plots a grouped bar chart comparing ROUGE on the three FLAN-T5 models
+
+    Requires the evaluation results from the experiments to be saved at
+    ./results/results.csv
+    """
+    results = pd.read_csv(f"{ROOT_PATH}/results/results.csv")
+    results = results.set_index("Model")
+
+    metrics = ["rouge1", "rouge2", "rougeL", "rougeLsum"]
+    models = ["untuned", "full", "lora"]
+
+    rougeScores = {model: results.loc[model, metrics].round(4).tolist() for model in models}
+
+    fig, ax = plt.subplots(figsize=(10,6), layout="constrained")
+
+    bars = ax.grouped_bar(rougeScores, tick_labels=metrics, group_spacing=1)
+    for container in bars.bar_containers:
+        ax.bar_label(container, padding=3)
+
+    ax.set_ylabel("ROUGE Score")
+    ax.set_title("ROUGE Comparison for Each FLAN-T5 Model")
+    ax.legend()
+
+    plt.savefig(f"{ROOT_PATH}/results/rouge_plot.png")
+    plt.close()
+
 def main_experiment():
     """Runs the main experiments of the project
     
@@ -393,6 +420,9 @@ def main_experiment():
 
         # Frees up memory before loading and training the next model
         del model
+
+    # Create a save plot comparing ROUGE across models
+    plot_rouge_comparison()
 
 def save_data(results, safetySamples):
     """Saves the training results and sample of generated summaries"""
