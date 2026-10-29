@@ -59,10 +59,72 @@ Note that both training and validation sets contained the radiology reports as w
 
 ## 4. Implementation and Training
 ### 4.1 File Structure
+```
+Flan_T5_s4803010/
+├── reference_images/    # Contains images used within the report
+├── README.md            # The project's report
+├── dataset.py           # Loads, tokenises and prepares the data into DataLoaders
+├── modules.py           # Defines the FLAN-T5 and configures LoRA adaption
+├── predict.py           # Loads the trained models to generate summaries
+├── train.py             # Handles training, validation and evaluation
+└── requirements.txt     # Dependencies
+```
+
 ### 4.2 Training Configurations
+Both fine-tuned models use similar training setups/procedures in order to compare fairly between the two methods. BF16 mixed precision was used for both models to reduce the memory requirements, and gradient clipping (with a max norm of 1.0) was used limit the risk of exploding gradients. After each training epoch, the models are evaluated on the validation set, where the checkpoint is saved every time validation loss decreases over epochs. Early stopping, with a patience of two epoch was implemented to reduce the chance of overfitting, however it was never triggered as all models trained for the full four epochs. Below is the hyperparameters used for training each model.
+
+| Hyperparameter | Full Fine-Tuning | LoRA |
+| --- | --- | --- |
+| Epochs | 4 | 4 |
+| Batch size | 8 | 8 |
+| Learning Rate | 5e-5 | 1e-4 |
+| Optimiser | AdamW | AdamW |
+| Weight Decay | Linear decay | Linear decay |
+| Warmup Steps | 5% of total steps | 5% of total steps | 
+| Mixed Precision | BF16 | BF16 |
+| LoRA rank | N/A | 16 |
+| LoRA alpha | N/A | 32 |
+| LoRA dropout | N/A | 0.05 |
+| LoRA target modules | N/A | all-linear |
+
 ### 4.3 Evaluation Process
+The three models were evaluated numerically on the entire validation set using ROUGE-1, ROUGE-2, ROUGE-L and ROUGE-Lsum. The ROUGE metrics measure lexical similarities between the n-grams of the generated and reference summaries. Although ROUGE is able to be used as a numerical measure of summarisation performance, it cannot directly evaluate clinical accuracy, which is why an additional manual safety audit is conducted as described below.
+
+The clinical safety audit was conducted on five randomly selected reports from the test dataset. The generated summaries for all three models are compared manually using human judgement in order to identify hallucinations, missing medical details and general readability. 
+
+Additionally to these two evaluation processes, the computational performance of each model is compared. This included model total and trainable parameter counts, Peak VRAM and inference throughput (the number of tokens generated per second). These metrics allowed for the analysis of specific trade-off between generation performance and computational requirements across the three models. 
+
 ### 4.4 Hardware Configurations
+| Component | Configuration |
+| --- | --- |
+| Platform | UQ Rangpur HPC Cluster |
+| GPU | NVIDIA A100 |
+| GPU VRAM | 40GB |
+
 ### 4.5 Installation and Usage
+The project was implemented using Python 3.12.13. The exact libraries and dependencies used within the project are recorded within `requirements.txt`, while a summarisation of the main dependencies can be seen below.
+
+| Dependency | Version |
+| --- | --- |
+| Python | 3.12.13|
+| PyTorch | 2.14.0 |
+| Transformers | 4.57.6 |
+| PEFT | 0.21.2 |
+| Datasets | 5.0.1 |
+| Evaluate | 0.4.6 |
+| rouge-score | 0.1.2 |
+| Matplotlib | 3.11.2 |
+| Pandas | 3.0.6 |
+
+To install the required dependencies, make a Python 3.12 environment and run the following command from the project's directory:
+
+```pip install -r requirements.txt```
+
+The training and evaluation experimentation loop can be run from the root using"
+
+```python recognition/Flan_T5_s4803010/train.py```
+
+This trains both the full fine-tuning and LoRA models before evaluating all three models. The best performing checkpoints are then stored within the directory `models/`, while the results are stored within `results/`.
 
 ## 5. Experimental Results
 ### 5.1 Training and Validation Comparison
