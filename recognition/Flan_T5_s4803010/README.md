@@ -269,6 +269,13 @@ However, during the safety audit it was observed that the fine-tuned models can 
 Although the fine-tuned models had higher ROUGE than the untuned model, and introduced hallucinations and information omissions far less frequently within the five cases evaluated, it cannot be concluded that higher ROUGE directly correlates to a higher clinical accuracy. This suggests that fine-tuning can improve ROUGE and clinical accuracy, however as stated before higher ROUGE scores can not fully guarantee that it will always be more clinically accurate. This shows ROUGE does not provide enough information to determine whether a model can be trusted, therefore additional safety evaluation should be set in place to determine whether summaries are accurate and preserve the clinical information within the original reports.  
 
 ### 6.3 Engineering Recommendations
+From the experimental results it is suggested that the Full Fine-Tuned FLAN-T5 model be used as the chosen model for future development. This is due to the fact that fine tuning in general was far more benefitial compared to the untuned model. And when comparing the two fine tuning methods, full fine-tuning demonstrated better performance compared to LoRA fine-tuning across multiple metrics. This inlucded having the highest ROUGE metrics whilst also having considerably good clinical accuracy for summarisation. Additionally to this the model took over 2 hours less to train compared to the LoRA model and also was able to generate summary tokens roughly 65% faster.
+
+However if the deployment environment had strict GPU memory limits, the LoRA fine-tuned model may be better suited. This is because overall it performance very similarly to the full fine-tuned model, however had a lower peak VRAM usage of 11.74GB compared to the 13.49GB peak for the full fine-tuned model. 
+
+Even though the fine-tuned models achieved significantly higher ROUGE scores than the untuned model, neither model should be deployed indiviually without an additional safety audit layer between the models and the results the patients would recieve. This could be implemented by having automatic checks to ensure summaries don't contain errors such as contradictions or unsupported medical findings, and should be flagged for manual human analysis if errors are detected before the summaries are sent to the users. Additionally the summaries should never be directly provided to patients without a warning that the summaries might be incorrect. 
+
+Overall fine-tuning is recommended to be used within a report summarisation system, however extra focus should be placed on clinical accuracy by ensuring additional safety measures are put in place.
 
 ## 7. Feasibility Review
 ### 7.1 User Need, Scope and Acceptance Criteria
