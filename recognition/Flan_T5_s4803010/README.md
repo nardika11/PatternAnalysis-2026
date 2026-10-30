@@ -25,7 +25,7 @@ Low-Rank Adaptation aims to make fine-tuning more efficient by reducing the numb
 
 By training on just the smaller two matrices, LoRA significantly reduces the amount of trainable parameters, therefore reducing the computational requirements. However by limiting the parameter updated to a smaller subset, the model's ability to learn clinical summarisation may be limited compared to full fine-tuning.
 
-![Fine tuning diagram](./reference_images/Lora.png)
+![Fine tuning diagram](./reference_images/lora.png)
 
 *Figure 2: Comparison of full fine-tuning and LoRA*
 
@@ -179,10 +179,86 @@ The result table above demonstrates that LoRA fine-tuning, which had considerabl
 
 Interestingly, even though the LoRA model updated far less parameters, it took 2 hours and 19 minutes longer to train compared to the full fine-tuned model. Additionally the LoRA model was noticeably slower at generating output tokens compared to the other two models, with it's inference throughput being only 50.13% of the untuned model and 60.48% of the full fine-tuned model. This may be due to the LoRA models target modules being set to 'all-linear', which applies the LoRA adapters to all linear layers of the model. Due to this the additional overhead of dealing with the matrix operations of the smaller matrices may outweigh the computation benefits of updating less parameters. The target module was chosen to be 'all-linear' as it allows for a closer performance comparison to the full fine-tuned model. Future experiments could be conducted using the target module as ['q', 'k'], (just the query a key layers), which may reduce computational requirements but at the same time may reduce generation performance. 
 
-Overall the comparisons conducted on the experiments results suggest that the full fine-tuned model is the 'best' choice in model. This is because it had far better performance on the ROUGE metrics compared to the untuned model and also had better computational results compared to the LoRA fine-tuned model, specifically training time and inference throughput. 
+Overall the comparisons conducted on the experiments results suggest that the full fine-tuned model is quantitatively the 'best' choice in model. This is because it had far better performance on the ROUGE metrics compared to the untuned model and also had better computational results compared to the LoRA fine-tuned model, specifically training time and inference throughput. 
 
 ## 6. Open Research Dilemma 
 ### 6.1 Clinical Safety Audit 
+A manual clinical safety audit was completed to investigate not only if fine-tuning improves quantitative performance (through ROUGE), but also if it improves clinical accuracy and reduce errors that could cause safety issues. The audit was conducted on a random sample of five reports from the test set, in order to reproduce the results the function `test()` within the file `train.py` can should be run using a seed of 12. The specific errors and details that were being identified during the audit are described below:
+- Factual Faithfulness: whether the models introduced hallucinated information within their summaries
+- Information Completeness: whether important details from the report were left out of the generated summaries
+- Layperson Readability: whether the summary can be understood by someone without medical knowledge
+
+---
+
+**Case 1:**
+
+**Original Report:** Air trapping is noted. No evidence of parenchymal lung infiltrates or consolidation is observed.
+
+**Untuned Summary:** The present study demonstrates that a pulmonary infiltrate is present in the lung.
+
+**Full Fine-Tuned Summary:** There is a condition where air is trapped in the lungs. There are no signs of lung tissue infections or solid areas in the lungs that would indicate a problem.
+
+**LoRA Fine-Tuned Summary:** There is a condition where air is trapped in the lungs. There are no signs of lung tissue infections or solid areas in the lungs that are not clear.
+
+**Analysis:** The untuned model has a major hallucination stating that a pumlmonary infiltrate is present however the original report states otherwise. Additionally it omits the finding that air is trapped, and also does not increase layman readability as it continues to use medical terminology. Whereas the two fine-tuned models correctly preserve the fact that air is trapped and that there are no signs of lung tissue infections, additionally they both use more general terminology rather than medical terms. However, within the LoRA summary there is the phrase "solid areas in the lungs that are not clear" which reduces that clinical confidence of the findings. Overall the full fine-tuned model generates the clearest and most clinically correct summary.
+
+---
+
+**Case 2:**
+
+**Original Report:** Mild cardiomegaly due to ventricular enlargement. Pulmonary vasculature is normal. No evidence of mediastinal mass effect. Pulmonary parenchyma is normal. Costophrenic angles are clear. No pleural thickening observed.
+
+**Untuned Summary:** The pulmonary artery is normal.
+
+**Full Fine-Tuned Summary:** The heart is slightly larger than normal because the heart's pumping chambers have grown. The blood vessels in the lungs look fine. There's no sign of a mass in the middle of the chest. The lung tissue looks normal. The areas where the lungs meet the chest wall are clear. There's nothing thickening of the lung lining seen.
+
+**LoRA Fine-Tuned Summary:** The heart is slightly enlarged because the heart's pumping chambers are larger than normal. The blood vessels in the lungs are normal. There is no sign of mass in the middle of the chest. The lung tissue looks normal. The angles where the lungs meet the chest wall are clear. There is no thickening of the lung lining.
+
+**Analysis:** A major error within the untuned model is that the majority of the findings of the original report are omitted from the summary. On the other hand the two fine-tuned models preserve a significantly larger amount of the clinical findings using non-medical terms which makes readability easier. However the fine tuned models both encounter a major issue of factual faithfullness as they both interpret the original report's finding of "No evidence of mediastinal mass effect" as that there is "no sign of a mass" which is a stronger conclusion than what is stated within the original report. For this case it can been seen that the LoRA model produced a more grammatically correct summary than the full fine-tuned model which states "There's nothing thickening of the lung lining seen"
+---
+
+**Case 3:**
+
+**Original Report:** Radiologic signs of COPD. Pleuroparenchymal thickening with bilateral apical pleural thickening, likely related to post-radiotherapy changes.
+
+**Untuned Summary:** A radiologic report of a pleural thickening with bilateral apical pleural thickeneding.
+
+**Full Fine-Tuned Summary:** The radiology images show signs of Chronic Obstructive Pulmonary Disease (COPD). There is thickening of the lung tissue and the membrane surrounding the lungs, with thickening at the top of both lungs, likely due to changes after radiation therapy.
+
+**LoRA Fine-Tuned Summary:** The radiology images show signs of Chronic Obstructive Pulmonary Disease (COPD). There is thickening of the lung tissue and thickening of both the top parts of the lungs, which is likely due to changes after radiation therapy.
+
+**Analysis:** Within case 3 the untuned model fails to mention the findings of COPD and the possible relation to past radiotherapy. These issues aren't seen within the fine-tuned models which include most of the information present within the report and even increases layman readability by doing stuff like defining what the COPD acronym is. It is also seen that the full fine-tuned model defines the fact that there is thickening of the membrane surrounding the lungs, described by "Pleuroparenchymal thickening", which the LoRA model omits. 
+---
+
+**Case 4:**
+
+**Original Report:** Increased interstitial reticular pattern with peripheral and bilateral distribution, apparently sparing only the left upper lung field, without alveolar opacities to suggest superimposed pneumonia. These findings are consistent with the radiological expression of COVID-19 pathology. Costophrenic angles are clear. No signs of cardiac decompensation.
+
+**Untuned Summary:** A recurrent pulmonary edema with a recurrent recurrent edema is present in a pulmonary emphysema.
+
+**Full Fine-Tuned Summary:** The x-ray shows a pattern that looks like a net, spread out in both lungs, but only on the left side. There are no signs of pneumonia in the air sacs. These findings match what we see in COVID-19. The areas where the lungs meet the chest wall are clear. There are no indications of the heart not working properly.
+
+**LoRA Fine-Tuned Summary:** The x-ray shows a pattern that looks like a net, mainly at the edges and on both sides, but it's not only the left upper part of the lung, and there are no cloudy areas in the lungs that would suggest pneumonia. These findings are typical for the symptoms of COVID-19. The areas where the lungs meet the diaphragm are clear. There are no signs of heart failure.
+
+**Analysis:** The untuned summary demonstrates multiple errors including general grammatrical issues that make readability worse. Additionally it includes many hallucinations such as the pulmonary edma and pulmonary emphysema which are not present within the original report. Within the original report it is stated that the abnormalities affect both lung but spared the upper left lung, whereas the full fine-tuned model states only the left side is affected whilst also stating that it is spread out in both lungs. This reduces the ability to understand the summary and also reduces the clinical confidence of the summary. This is similarly seen within the LoRA model which doesn't clearly specify what areas of the lungs are affected. Overall both fine-tuned models preserve more clinical information compared to the untuned model, however the uncertainty of what areas are affected may confuse patients trying to read the summaries. 
+
+---
+
+**Case 5:**
+
+**Original Report:** No signs of metastatic disease or significant changes compared to the previous control study are identified.
+
+**Untuned Summary:** A metastatic ovarian tumour is not a recurrence of a previous study.
+
+**Full Fine-Tuned Summary:** There are no indications of cancer spreading or any major changes compared to the previous examination.
+
+**LoRA Fine-Tuned Summary:** There are no indications of cancer spreading to other parts of the body or any major changes compared to the previous examination.
+
+**Analysis:** The untuned model hallucinated the idea of an ovarian tumour which is never stated within the original report and also fails to mention that there are no signs of metastatic disease. On the other hand, the fine-tuned models both mention that there is no signs of the disease spreading, with the additional finding that there are no extra changes from the past examinations.
+
+
+Overall the clinical safety audit has demonstrated that the untuned model frequently hallucinated clinical findings whilst at the same time failed to state the majority of the findings within the actual reports. It also demonstrated that both of the fine-tuned models improved factual faithfulness, information completeness and layman readability compared to the baseline untuned model. However it was seen that the fine-tuned models can still create errors within the summarisations such as incorrectly negating findings and stating contradicting information. These findings show that even though fine-tuning improves the summarisation compared to a baseline, neither model can be considered 100% clinically correct without a manual safety check. It should be considered that the findings of the safety audit may not generalise to the overall error rates of the dataset as it was only conducted on 5 samples from the total 10,537 test datapoints. 
+
 ### 6.2 ROUGE vs Clinical Factual Accuracy
 ### 6.3 Engineering Recommendations
 
@@ -195,7 +271,7 @@ Acceptance Criteria:
 - Fine tuning improves Rouge evaluation metric compared to a zero-shot baseline
 - A manual evaluation is conducted on sample cases to identify errors such as hallucinations, missing information and layman readability
 - An evaluation on the trade-offs between Rouge metrics and clinical accuracy/readability has been conducted
-- Training is able to be completed using the rangpur A100 cluster in under 5 hours each, with training metrics such as runtime, peak VRAM and parameter counts being documented
+- Training is able to be completed using the rangpur A100 cluster in under 6 hours each, with training metrics such as runtime, peak VRAM and parameter counts being documented
 
 ### 7.2 Model Choice and Course Concepts
 Google's FLAN-T5 encoder-decoder model will be the foundation of each model variation that is experimented on for the project, which is a hard difficulty. FLAN-T5 is an instruction based sequence to sequence model that has been trained for over 1000 NLP tasks which also includes summarisation. Additionally, the FLAN-T5 architecture is well suited for this projects task, since the encoder component allows the model to understand and create representations for the medical report, while the decoder component can then decode these representations in order to generate layman summaries of the original text. 
