@@ -311,3 +311,14 @@ After the baseline model completion for the feasibility test, the next step is t
 AI has not been used within this project and report.
 
 ## 9. References
+ACL, B.S.T. at (no date) Biolaysumm/biolaysumm2025-laymanrrg-opensource-track · datasets at hugging face, BioLaySumm/BioLaySumm2025-LaymanRRG-opensource-track · Datasets at Hugging Face. Available at: https://huggingface.co/datasets/BioLaySumm/BioLaySumm2025-LaymanRRG-opensource-track (Accessed: 30 October 2026). 
+
+Chadha, A. (2026) Understanding low-rank adaptation (Lora): A revolution in fine-tuning large language models, Hugging Face – The AI community building the future. Available at: https://huggingface.co/blog/Neural-Hacker/lora (Accessed: 30 October 2026). 
+
+GeeksforGeeks (2026) Low rank adaptation (Lora), GeeksforGeeks. Available at: https://www.geeksforgeeks.org/deep-learning/low-rank-adaptation-lora/ (Accessed: 30 October 2026). 
+
+Optimizers and Schedulers · hugging face (no date) Optimizers and schedulers · Hugging Face. Available at: https://huggingface.co/docs/transformers/en/optimizers (Accessed: 30 October 2026). 
+
+Reference api (no date) Automatic Mixed Precision package - torch.amp - PyTorch 2.14 documentation. Available at: https://docs.pytorch.org/docs/2.14/amp.html (Accessed: 30 October 2026). 
+
+Vaswani, A. et al. (2023) Attention is all you need, arXiv.org. Available at: https://arxiv.org/abs/1706.03762 (Accessed: 30 October 2026). 
