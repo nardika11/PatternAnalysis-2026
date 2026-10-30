@@ -126,6 +126,17 @@ The training and evaluation experimentation loop can be run from the root using"
 
 This trains both the full fine-tuning and LoRA models before evaluating all three models. The best performing checkpoints are then stored within the directory `models/`, while the results are stored within `results/`.
 
+**Generating Summaries**
+The `predict.py` file can be used to generate layman summaries of radiology reports without having to rerun training. 
+
+To run the prediction script execute the following command from the project's root:
+
+```python recognition/Flan_T5_s4803010/predict.py```
+
+The script excepts two additional arguments:
+- --model: specifies which model to use (untuned, full or lora), by default the full fine-tuned model is used
+- --report: specifies the radiology report to summaries, if not provided a predefined report is used
+
 ## 5. Experimental Results
 ### 5.1 Training and Validation Comparison
 Both of the full fine-tuned and LoRA fine-tuned models were trained over 4 epochs on the training dataset. The training and validation losses were measure at each epoch to ensure the models were training correctly. The epoch with the best validation loss was saved as the best performing checkpoint.
@@ -258,6 +269,7 @@ A manual clinical safety audit was completed to investigate not only if fine-tun
 
 **Analysis:** The untuned model hallucinated the idea of an ovarian tumour which is never stated within the original report and also fails to mention that there are no signs of metastatic disease. On the other hand, the fine-tuned models both mention that there is no signs of the disease spreading, with the additional finding that there are no extra changes from the past examinations.
 
+---
 
 Overall the clinical safety audit has demonstrated that the untuned model frequently hallucinated clinical findings whilst at the same time failed to state the majority of the findings within the actual reports. It also demonstrated that both of the fine-tuned models improved factual faithfulness, information completeness and layman readability compared to the baseline untuned model. However it was seen that the fine-tuned models can still create errors within the summarisations such as incorrectly negating findings and stating contradicting information. These findings show that even though fine-tuning improves the summarisation compared to a baseline, neither model can be considered 100% clinically correct without a manual safety check. It should be considered that the findings of the safety audit may not generalise to the overall error rates of the dataset as it was only conducted on 5 samples from the total 10,537 test datapoints. 
 
