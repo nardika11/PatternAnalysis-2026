@@ -215,6 +215,7 @@ A manual clinical safety audit was completed to investigate not only if fine-tun
 **LoRA Fine-Tuned Summary:** The heart is slightly enlarged because the heart's pumping chambers are larger than normal. The blood vessels in the lungs are normal. There is no sign of mass in the middle of the chest. The lung tissue looks normal. The angles where the lungs meet the chest wall are clear. There is no thickening of the lung lining.
 
 **Analysis:** A major error within the untuned model is that the majority of the findings of the original report are omitted from the summary. On the other hand the two fine-tuned models preserve a significantly larger amount of the clinical findings using non-medical terms which makes readability easier. However the fine tuned models both encounter a major issue of factual faithfullness as they both interpret the original report's finding of "No evidence of mediastinal mass effect" as that there is "no sign of a mass" which is a stronger conclusion than what is stated within the original report. For this case it can been seen that the LoRA model produced a more grammatically correct summary than the full fine-tuned model which states "There's nothing thickening of the lung lining seen"
+
 ---
 
 **Case 3:**
@@ -228,6 +229,7 @@ A manual clinical safety audit was completed to investigate not only if fine-tun
 **LoRA Fine-Tuned Summary:** The radiology images show signs of Chronic Obstructive Pulmonary Disease (COPD). There is thickening of the lung tissue and thickening of both the top parts of the lungs, which is likely due to changes after radiation therapy.
 
 **Analysis:** Within case 3 the untuned model fails to mention the findings of COPD and the possible relation to past radiotherapy. These issues aren't seen within the fine-tuned models which include most of the information present within the report and even increases layman readability by doing stuff like defining what the COPD acronym is. It is also seen that the full fine-tuned model defines the fact that there is thickening of the membrane surrounding the lungs, described by "Pleuroparenchymal thickening", which the LoRA model omits. 
+
 ---
 
 **Case 4:**
@@ -260,6 +262,12 @@ A manual clinical safety audit was completed to investigate not only if fine-tun
 Overall the clinical safety audit has demonstrated that the untuned model frequently hallucinated clinical findings whilst at the same time failed to state the majority of the findings within the actual reports. It also demonstrated that both of the fine-tuned models improved factual faithfulness, information completeness and layman readability compared to the baseline untuned model. However it was seen that the fine-tuned models can still create errors within the summarisations such as incorrectly negating findings and stating contradicting information. These findings show that even though fine-tuning improves the summarisation compared to a baseline, neither model can be considered 100% clinically correct without a manual safety check. It should be considered that the findings of the safety audit may not generalise to the overall error rates of the dataset as it was only conducted on 5 samples from the total 10,537 test datapoints. 
 
 ### 6.2 ROUGE vs Clinical Factual Accuracy
+The results from the ROUGE evaluation demonstrated that both fine-tuning models achieved significantly higher ROUGE scores compared to the baseline untuned model. Similarly the clinical safety audit also showed that the fine-tuned models generally produce more readable and clinically accurate summaries of the radiology reports. 
+
+However, during the safety audit it was observed that the fine-tuned models can still produce errors in summarisation. For example in case 2, both fine-tuned models incorrectly stated that the absence of mediastinal mass effect meant there was an absence of mass. This reveals that achieving higher ROUGE scores does not fully guarantee that the models will be 100% clinically safe, since ROUGE can only evaluate lexical similarities rather than the correctness of what it is actually generating.
+
+Although the fine-tuned models had higher ROUGE than the untuned model, and introduced hallucinations and information omissions far less frequently within the five cases evaluated, it cannot be concluded that higher ROUGE directly correlates to a higher clinical accuracy. This suggests that fine-tuning can improve ROUGE and clinical accuracy, however as stated before higher ROUGE scores can not fully guarantee that it will always be more clinically accurate. This shows ROUGE does not provide enough information to determine whether a model can be trusted, therefore additional safety evaluation should be set in place to determine whether summaries are accurate and preserve the clinical information within the original reports.  
+
 ### 6.3 Engineering Recommendations
 
 ## 7. Feasibility Review
@@ -293,5 +301,6 @@ Another risk is that the fine tuned model perform worse on the ROUGE evaluation 
 After the baseline model completion for the feasibility test, the next step is to implement the module and setup required for LoRA fine tuning. After this the full fine tuning will be trained and then all three versions will be evaluated against each other. 
 
 ## 8. AI Usage Disclosure
+AI has not been used within this project and report.
 
 ## 9. References
